@@ -1,0 +1,299 @@
+This is pdfTeX, Version 3.14159265-2.6-1.40.16 (MiKTeX 2.9) (preloaded format=pdflatex 2016.1.18)  9 APR 2016 15:18
+entering extended mode
+**"C:/Users/Harshil/Desktop/Acads/COP 290/Assignment 2/documentation/main.tex"
+("C:/Users/Harshil/Desktop/Acads/COP 290/Assignment 2/documentation/main.tex"
+LaTeX2e <2015/10/01> patch level 2
+Babel <3.9m> and hyphenation patterns for 69 languages loaded.
+("C:\Users\Harshil\AppData\Local\Programs\MiKTeX 2.9\tex\latex\base\article.cls
+"
+Document Class: article 2014/09/29 v1.4h Standard LaTeX document class
+("C:\Users\Harshil\AppData\Local\Programs\MiKTeX 2.9\tex\latex\base\size12.clo"
+File: size12.clo 2014/09/29 v1.4h Standard LaTeX file (size option)
+)
+\c@part=\count79
+\c@section=\count80
+\c@subsection=\count81
+\c@subsubsection=\count82
+\c@paragraph=\count83
+\c@subparagraph=\count84
+\c@figure=\count85
+\c@table=\count86
+\abovecaptionskip=\skip41
+\belowcaptionskip=\skip42
+\bibindent=\dimen102
+)
+("C:\Users\Harshil\AppData\Local\Programs\MiKTeX 2.9\tex\latex\graphics\graphic
+x.sty"
+Package: graphicx 2014/10/28 v1.0g Enhanced LaTeX Graphics (DPC,SPQR)
+
+("C:\Users\Harshil\AppData\Local\Programs\MiKTeX 2.9\tex\latex\graphics\keyval.
+sty"
+Package: keyval 2014/10/28 v1.15 key=value parser (DPC)
+\KV@toks@=\toks14
+)
+("C:\Users\Harshil\AppData\Local\Programs\MiKTeX 2.9\tex\latex\graphics\graphic
+s.sty"
+Package: graphics 2014/10/28 v1.0p Standard LaTeX Graphics (DPC,SPQR)
+
+("C:\Users\Harshil\AppData\Local\Programs\MiKTeX 2.9\tex\latex\graphics\trig.st
+y"
+Package: trig 1999/03/16 v1.09 sin cos tan (DPC)
+)
+("C:\Users\Harshil\AppData\Local\Programs\MiKTeX 2.9\tex\latex\00miktex\graphic
+s.cfg"
+File: graphics.cfg 2007/01/18 v1.5 graphics configuration of teTeX/TeXLive
+)
+Package graphics Info: Driver file: pdftex.def on input line 94.
+
+("C:\Users\Harshil\AppData\Local\Programs\MiKTeX 2.9\tex\latex\pdftex-def\pdfte
+x.def"
+File: pdftex.def 2011/05/27 v0.06d Graphics/color for pdfTeX
+
+("C:\Users\Harshil\AppData\Local\Programs\MiKTeX 2.9\tex\generic\oberdiek\infwa
+rerr.sty"
+Package: infwarerr 2010/04/08 v1.3 Providing info/warning/error messages (HO)
+)
+("C:\Users\Harshil\AppData\Local\Programs\MiKTeX 2.9\tex\generic\oberdiek\ltxcm
+ds.sty"
+Package: ltxcmds 2011/11/09 v1.22 LaTeX kernel commands for general use (HO)
+)
+\Gread@gobject=\count87
+))
+\Gin@req@height=\dimen103
+\Gin@req@width=\dimen104
+)
+("C:\Users\Harshil\AppData\Local\Programs\MiKTeX 2.9\tex\latex\amsmath\amsmath.
+sty"
+Package: amsmath 2013/01/14 v2.14 AMS math features
+\@mathmargin=\skip43
+
+For additional information on amsmath, use the `?' option.
+
+("C:\Users\Harshil\AppData\Local\Programs\MiKTeX 2.9\tex\latex\amsmath\amstext.
+sty"
+Package: amstext 2000/06/29 v2.01
+
+("C:\Users\Harshil\AppData\Local\Programs\MiKTeX 2.9\tex\latex\amsmath\amsgen.s
+ty"
+File: amsgen.sty 1999/11/30 v2.0
+\@emptytoks=\toks15
+\ex@=\dimen105
+))
+("C:\Users\Harshil\AppData\Local\Programs\MiKTeX 2.9\tex\latex\amsmath\amsbsy.s
+ty"
+Package: amsbsy 1999/11/29 v1.2d
+\pmbraise@=\dimen106
+)
+("C:\Users\Harshil\AppData\Local\Programs\MiKTeX 2.9\tex\latex\amsmath\amsopn.s
+ty"
+Package: amsopn 1999/12/14 v2.01 operator names
+)
+\inf@bad=\count88
+LaTeX Info: Redefining \frac on input line 210.
+\uproot@=\count89
+\leftroot@=\count90
+LaTeX Info: Redefining \overline on input line 306.
+\classnum@=\count91
+\DOTSCASE@=\count92
+LaTeX Info: Redefining \ldots on input line 378.
+LaTeX Info: Redefining \dots on input line 381.
+LaTeX Info: Redefining \cdots on input line 466.
+\Mathstrutbox@=\box26
+\strutbox@=\box27
+\big@size=\dimen107
+LaTeX Font Info:    Redeclaring font encoding OML on input line 566.
+LaTeX Font Info:    Redeclaring font encoding OMS on input line 567.
+\macc@depth=\count93
+\c@MaxMatrixCols=\count94
+\dotsspace@=\muskip10
+\c@parentequation=\count95
+\dspbrk@lvl=\count96
+\tag@help=\toks16
+\row@=\count97
+\column@=\count98
+\maxfields@=\count99
+\andhelp@=\toks17
+\eqnshift@=\dimen108
+\alignsep@=\dimen109
+\tagshift@=\dimen110
+\tagwidth@=\dimen111
+\totwidth@=\dimen112
+\lineht@=\dimen113
+\@envbody=\toks18
+\multlinegap=\skip44
+\multlinetaggap=\skip45
+\mathdisplay@stack=\toks19
+LaTeX Info: Redefining \[ on input line 2665.
+LaTeX Info: Redefining \] on input line 2666.
+)
+("C:\Users\Harshil\AppData\Local\Programs\MiKTeX 2.9\tex\latex\graphics\color.s
+ty"
+Package: color 2014/10/28 v1.1a Standard LaTeX Color (DPC)
+
+("C:\Users\Harshil\AppData\Local\Programs\MiKTeX 2.9\tex\latex\00miktex\color.c
+fg"
+File: color.cfg 2007/01/18 v1.5 color configuration of teTeX/TeXLive
+)
+Package color Info: Driver file: pdftex.def on input line 142.
+
+("C:\Users\Harshil\AppData\Local\Programs\MiKTeX 2.9\tex\latex\graphics\dvipsna
+m.def"
+File: dvipsnam.def 2014/10/14 v3.0j Driver-dependent file (DPC,SPQR)
+))
+("C:\Users\Harshil\AppData\Local\Programs\MiKTeX 2.9\tex\latex\base\fontenc.sty
+"
+Package: fontenc 2005/09/27 v1.99g Standard LaTeX package
+ ("C:\Users\Harshil\AppData\Local\Programs\MiKTeX 2.9\tex\latex\base\t1enc.def"
+File: t1enc.def 2005/09/27 v1.99g Standard LaTeX file
+LaTeX Font Info:    Redeclaring font encoding T1 on input line 48.
+))
+("C:\Users\Harshil\AppData\Local\Programs\MiKTeX 2.9\tex\latex\psnfss\helvet.st
+y"
+Package: helvet 2005/04/12 PSNFSS-v9.2a (WaS) 
+) (main.aux
+
+LaTeX Warning: Label `overflow' multiply defined.
+
+
+LaTeX Warning: Label `overflow' multiply defined.
+
+)
+\openout1 = `main.aux'.
+
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 13.
+LaTeX Font Info:    ... okay on input line 13.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 13.
+LaTeX Font Info:    ... okay on input line 13.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 13.
+LaTeX Font Info:    ... okay on input line 13.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 13.
+LaTeX Font Info:    ... okay on input line 13.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 13.
+LaTeX Font Info:    ... okay on input line 13.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 13.
+LaTeX Font Info:    ... okay on input line 13.
+LaTeX Font Info:    Try loading font information for T1+ptm on input line 13.
+ ("C:\Users\Harshil\AppData\Local\Programs\MiKTeX 2.9\tex\latex\psnfss\t1ptm.fd
+"
+File: t1ptm.fd 2001/06/04 font definitions for T1/ptm.
+)
+\GPT@outputbox=\box28
+LaTeX Font Info:    Font shape `T1/ptm/bx/n' in size <17.28> not available
+(Font)              Font shape `T1/ptm/b/n' tried instead on input line 19.
+LaTeX Font Info:    Try loading font information for OMS+ptm on input line 21.
+
+("C:\Users\Harshil\AppData\Local\Programs\MiKTeX 2.9\tex\latex\psnfss\omsptm.fd
+"
+File: omsptm.fd 
+)
+LaTeX Font Info:    Font shape `OMS/ptm/m/n' in size <12> not available
+(Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 21.
+LaTeX Font Info:    Font shape `T1/ptm/bx/n' in size <12> not available
+(Font)              Font shape `T1/ptm/b/n' tried instead on input line 24.
+ [1
+
+{C:/Users/Harshil/AppData/Local/MiKTeX/2.9/pdftex/config/pdftex.map}]
+<workflow.jpg, id=8, 1457.445pt x 1157.32375pt>
+File: workflow.jpg Graphic file (type jpg)
+ <use workflow.jpg>
+Package pdftex.def Info: workflow.jpg used on input line 73.
+(pdftex.def)             Requested size: 426.79134pt x 338.89992pt.
+
+Overfull \hbox (36.79134pt too wide) in paragraph at lines 73--74
+[][] 
+ []
+
+[2] [3 <./workflow.jpg>] <eventflow.png, id=15, 604.50844pt x 271.0125pt>
+File: eventflow.png Graphic file (type png)
+
+<use eventflow.png>
+Package pdftex.def Info: eventflow.png used on input line 105.
+(pdftex.def)             Requested size: 426.79134pt x 191.33676pt.
+
+Overfull \hbox (36.79134pt too wide) in paragraph at lines 105--106
+[][] 
+ []
+
+[4] [5 <./eventflow.png>] <erd.png, id=22, 585.68813pt x 182.18062pt>
+File: erd.png Graphic file (type png)
+
+<use erd.png>
+Package pdftex.def Info: erd.png used on input line 173.
+(pdftex.def)             Requested size: 426.79134pt x 132.76001pt.
+
+Overfull \hbox (36.79134pt too wide) in paragraph at lines 173--174
+[][] 
+ []
+
+[6] [7 <./erd.png>]
+Overfull \hbox (77.78868pt too wide) in paragraph at lines 235--236
+[]\T1/ptm/m/n/12 Lodge new com-plaint: /com-plaints/new.jsontitle=<title>descri
+ption=<desc>scope=<scope> 
+ []
+
+[8]
+Overfull \hbox (64.24146pt too wide) in paragraph at lines 253--254
+[]\T1/ptm/m/n/12 Vote on a com-plaint: /com-plaints/postvote.json?complaintid=<
+complaintid>vote=<vote> 
+ []
+
+
+Overfull \hbox (82.09726pt too wide) in paragraph at lines 259--260
+[]\T1/ptm/m/n/12 Mark the com-plaint as re-solved: /com-plaints/markresolved.js
+on?complaintid=<complaintid> 
+ []
+
+
+Overfull \hbox (37.13452pt too wide) in paragraph at lines 265--267
+[]\T1/ptm/m/n/12 Add new user to db: /de-fault/adduser.json user-name=<username
+>password=<pass> 
+ []
+
+
+Overfull \hbox (9.88153pt too wide) in paragraph at lines 265--267
+\T1/ptm/m/n/12 firstname=<firstname>lastname=<lastname>entryno=<entryno>type=<t
+ype> 
+ []
+
+[9]
+Overfull \hbox (45.41014pt too wide) in paragraph at lines 311--313
+[]\T1/ptm/m/n/12 Tutorial on set-ting up server: \T1/ptm/m/it/12 https://www.di
+gitalocean.com/community/tutorials/how-
+ []
+
+
+Overfull \hbox (1.39459pt too wide) in paragraph at lines 314--316
+[]\T1/ptm/m/n/12 Design doc tips: \T1/ptm/m/it/12 http://www.cse.iitd.ernet.in/
+cs5110300/SessionAssignment2 
+ []
+
+
+Overfull \hbox (17.62482pt too wide) in paragraph at lines 322--323
+[][]
+ []
+
+[10] (main.aux)
+
+LaTeX Warning: There were multiply-defined labels.
+
+ ) 
+Here is how much of TeX's memory you used:
+ 1973 strings out of 493634
+ 25560 string characters out of 3134423
+ 85673 words of memory out of 3000000
+ 5357 multiletter control sequences out of 15000+200000
+ 24587 words of font info for 35 fonts, out of 3000000 for 9000
+ 1025 hyphenation exceptions out of 8191
+ 27i,6n,20p,461b,301s stack positions out of 5000i,500n,10000p,200000b,50000s
+{C:/Users/Harshil/AppData/Local/Programs/MiKTeX 2.9/fonts/enc/dvips/fontname/
+8r.enc}<C:/Users/Harshil/AppData/Local/Programs/MiKTeX 2.9/fonts/type1/public/a
+msfonts/cm/cmsy10.pfb><C:/Users/Harshil/AppData/Local/Programs/MiKTeX 2.9/fonts
+/type1/urw/times/utmb8a.pfb><C:/Users/Harshil/AppData/Local/Programs/MiKTeX 2.9
+/fonts/type1/urw/times/utmr8a.pfb><C:/Users/Harshil/AppData/Local/Programs/MiKT
+eX 2.9/fonts/type1/urw/times/utmri8a.pfb>
+Output written on main.pdf (10 pages, 190314 bytes).
+PDF statistics:
+ 55 PDF objects out of 1000 (max. 8388607)
+ 0 named destinations out of 1000 (max. 500000)
+ 16 words of extra memory for PDF output out of 10000 (max. 10000000)
+

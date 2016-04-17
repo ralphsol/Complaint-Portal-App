@@ -1,0 +1,88 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context="com.example.ajmeeranagaraj.assignment3.HomeFragment">
+
+    <!-- TODO: Update blank fragment layout -->
+
+    <ImageView
+        android:layout_width="match_parent"
+        android:layout_height="250dp"
+        android:id="@+id/imageView2"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true" />
+
+    <Space
+        android:layout_width="match_parent"
+        android:layout_height="15dp"
+        android:layout_below="@+id/imageView2"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true"
+        android:id="@+id/space" />
+
+    <EditText
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:id="@+id/editText"
+        android:layout_below="@+id/space"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true"
+        android:text="Check your complaint status here"
+        android:textStyle="italic"
+        android:textSize="16dp"
+        android:paddingLeft="15dp" />
+
+    <Space
+        android:layout_width="match_parent"
+        android:layout_height="10dp"
+        android:layout_below="@+id/editText"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true"
+        android:id="@+id/space2" />
+
+    <Space
+        android:layout_width="8dp"
+        android:layout_height="50dp"
+        android:layout_below="@+id/space2"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true"
+        android:id="@+id/space3" />
+
+    <EditText
+        android:layout_width="fill_parent"
+        android:layout_height="50dp"
+        android:inputType="number"
+        android:ems="10"
+        android:id="@+id/id_entry"
+        android:layout_below="@+id/space2"
+        android:layout_toRightOf="@+id/space3"
+        android:layout_toEndOf="@+id/space3"
+        android:layout_toStartOf="@+id/checkstatus"
+        android:clickable="true"
+        android:hint="Complaint-ID"
+        android:singleLine="true"
+        android:textColor="#010101" />
+
+    <Space
+        android:layout_width="8dp"
+        android:layout_height="50dp"
+        android:layout_below="@+id/space2"
+        android:layout_alignParentRight="true"
+        android:layout_alignParentEnd="true"
+        android:id="@+id/space4" />
+
+    <Button
+        android:layout_width="120dp"
+        android:layout_height="50dp"
+        android:text="CHECK"
+        android:id="@+id/checkstatus"
+        android:layout_alignTop="@+id/space4"
+        android:layout_toLeftOf="@+id/space4"
+        android:layout_toStartOf="@+id/space4"
+        android:clickable="true"
+        android:singleLine="true"
+        android:textColor="#040303"
+        android:textSize="16dp" />
+</RelativeLayout>
