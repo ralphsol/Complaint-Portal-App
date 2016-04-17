@@ -1,0 +1,595 @@
+(dp1
+S'output'
+p2
+S"<class 'sqlite3.IntegrityError'> foreign key constraint failed"
+p3
+sS'layer'
+p4
+S'C:\\Users\\Harshil\\Desktop\\Acads\\COP 290\\Assignment 1\\moodle-plus\\applications\\MoodlePlus\\controllers/default.py'
+p5
+sS'code'
+p6
+S'# -*- coding: utf-8 -*-\n# this file is released under public domain and you can use without limitations\n\n#########################################################################\n## This is a sample controller\n## - index is the default action of any application\n## - user is required for authentication and authorization\n## - download is for downloading files uploaded in the db (does streaming)\n#########################################################################\n\ndef index():\n    """\n    example action using the internationalization operator T and flash\n    rendered by views/default/index.html or views/generic.html\n\n    if you need a simple wiki simply replace the two lines below with:\n    return auth.wiki()\n    """\n    response.flash = T("Welcome on Moodle+")\n    return dict(noti_count=4)\n\ndef grades():\n    grades = db(db.grades.user_id==auth.user.id).select()\n    courses = []\n    for grade in grades:\n        courses.append(db(db.courses.id==grade.registered_course_id.course_id).select().first())\n    return dict(grades=grades, courses=courses)\n\ndef notifications():\n    noti = db(db.notifications.user_id==auth.user.id).select(orderby=~db.notifications.created_at)\n    db(db.notifications.user_id==auth.user.id).update(is_seen=1)\n    return dict(notifications=noti)\n\n\ndef logged_in():\n    return dict(success=auth.is_logged_in(), user=auth.user)\n\ndef logout():\n    return dict(success=True, loggedout=auth.logout())\n\ndef user():\n    """\n    exposes:\n    http://..../[app]/default/user/login\n    http://..../[app]/default/user/logout\n    http://..../[app]/default/user/register\n    http://..../[app]/default/user/profile\n    http://..../[app]/default/user/retrieve_password\n    http://..../[app]/default/user/change_password\n    http://..../[app]/default/user/manage_users (requires membership in\n    use @auth.requires_login()\n        @auth.requires_membership(\'group name\')\n        @auth.requires_permission(\'read\',\'table name\',record_id)\n    to decorate functions that need access control\n    """\n    return dict(form=auth())\n\n\n@cache.action()\ndef download():\n    """\n    allows downloading of uploaded files\n    http://..../[app]/default/download/[filename]\n    """\n    return response.download(request, db)\n\n\ndef call():\n    """\n    exposes services. for example:\n    http://..../[app]/default/call/jsonrpc\n    decorate with @services.jsonrpc the functions to expose\n    supports xml, json, xmlrpc, jsonrpc, amfrpc, rss, csv\n    """\n    return service()\n\n\n@request.restful()\ndef api():\n    response.view = \'generic.\'+request.extension\n    def GET(*args,**vars):\n        patterns = \'auto\'\n        parser = db.parse_as_rest(patterns,args,vars)\n        if parser.status == 200:\n            return dict(content=parser.response)\n        else:\n            raise HTTP(parser.status,parser.error)\n    def POST(table_name,**vars):\n        return db[table_name].validate_and_insert(**vars)\n    def PUT(table_name,record_id,**vars):\n        return db(db[table_name]._id==record_id).update(**vars)\n    def DELETE(table_name,record_id):\n        return db(db[table_name]._id==record_id).delete()\n    return dict(GET=GET, POST=POST, PUT=PUT, DELETE=DELETE)\n\ndef login():\n    userid = request.vars.userid\n    password = request.vars.password\n    user = auth.login_bare(userid,password)\n    return dict(success=False if not user else True, user=user)\n\n###EDIT\'s start###\n\ndef complaintlist():#list of all complaints ; /complaintlist.json\n    complaints = db(db.complaints).select()\n    return dict(complaints=complaints)\n\n@auth.requires_login()\ndef newcomplaint():# ; /newcomplaint.json?comp_type=<comp_type>&title=<title>&description=<description>\n    if ("comp_type" in request.vars) and ("description" in request.vars):\n        comp_type = int(request.vars["comp_type"])\n        description = str(request.vars["description"]).strip()\n        title = str(request.vars["title"]).strip()\n        if comp_type==0:\n            resolver = auth.user.id\n        elif comp_type==1:\n            resolver = auth.user.hostel\n        elif comp_type==2:\n            resolver = 3\n        cid = db.complaints.insert(user_id=auth.user.id, type_=comp_type, title=title, description=description, resolved=False, resolver=resolver)\n        \'\'\'\n        users = []\n        if comp_type==0:\n            users.append(auth.user.id)\n        elif comp_type==1:\n            users = (db.users.hostel==auth.user.hostel)\n        elif comp_type==2:\n            users = db.users\n        for user in users:\n            db.notifications.insert(user_id=user, description="%s posted a new complaint for %s"%((auth.user.first_name+" "+auth.user.last_name).title(), title))\n        \'\'\'\n        return dict(success=True, cid=cid)\n    else:\n        return dict(success=False)\n\n@auth.requires_login()\ndef resolve():#resolves complaint (input = complaint_id) ; /resolve.json/<complaint_id>\n    try:\n        cid = int(request.args[0])\n    except Exception, e:\n        raise e\n    if (db(db.complaints.id==cid).select().first().resolver)==auth.user.id:\n        db(db.complaints.id==cid).update(resolved = True)\n        return dict(success=True)\n    return dict(success=False)\n    #return dict(val=db(db.complaints.id==cid).select().first().resolver)\n\n@auth.requires_login()\ndef complaint():#return complaint with comments (input = complaint_id) ; /complaint.json/<complaint_id>\n    try:\n        cid = int(request.args[0])\n    except Exception, e:\n        raise e\n    complaints = db(db.complaints.id==cid).select().first()\n    comments, comment_users = get_comments(cid)\n    return dict(complaints=complaints, comments=comments, comment_users=comment_users)\n\ndef get_comments(complaint_id):#caller function\n    comments =  db(db.compcomm.complaint_id==complaint_id).select()\n    comment_users = []\n    for comment in comments:\n        comment_users.append(db(db.users.id==comment.user_id).select().first())\n    return comments, comment_users\n\n@auth.requires_login()\ndef post_comment():#post new comment ; /post_comment.json?complaint_id=<complaint_id>&description=<description>\n    try:\n        cid = int(request.vars["complaint_id"])\n    except Exception, e:\n        raise e\n    try:\n        desc = str(request.vars["description"])\n    except Exception, e:\n        raise e\n    comment_id = db.compcomm.insert(complaint_id=cid, user_id=auth.user.id, description=desc)\n    comment = db(db.compcomm.id==comment_id).select().first()\n    return dict(success=True, comment=comment, user_name=(auth.user.first_name+" "+auth.user.last_name).title(), time_readable=timeHuman(comment.created_at), user=auth.user)\n\n###EDIT\'s end###\n\ndef populate_db():\n    ## Populate DB Script\n\n    ## clear database\n    for table in db.tables():\n            try:\n                    db(db[table].id>0).delete()\n                    print "Cleared",table\n            except Exception, e:\n                    print "Couldn\'t clear",table\n\n    ## create 3 students\n    db.users.insert(\n            first_name="Saiesvar",  # Kumaon\n            last_name="Vipparathy",\n            email="cs1140266@cse.iitd.ac.in",\n            username="cs1140266",\n            entry_no="2014CS10266",\n            type_=0,\n            password="saiesvar",\n    )\n\n    db.users.insert(\n            first_name="Harshil",   # Girnar\n            last_name="Meena",\n            email="cs1140222@cse.iitd.ac.in",\n            username="cs1140222",\n            entry_no="2014CS10222",\n            type_=0,\n            password="harshil",\n    )\n\n    db.users.insert(\n            first_name="Nagaraju",  # Girnar\n            last_name="Ajmeera",\n            email="cs1140208@cse.iitd.ac.in",\n            username="cs1140208",\n            entry_no="2014CS10208",\n            type_=0,\n            password="nagaraju",\n    )\n\n\n    ## create 2 wardens + 1 dean\n\n    db.users.insert(\n            first_name="Warden",\n            last_name="Kumaon",\n            email="wardenkumaon@cse.moodle.in",\n            username="wardenkumaon",\n            entry_no="wardenkumaon",\n            type_=1,\n            password="wardenkumaon",\n    )\n\n    db.users.insert(\n            first_name="Warden",\n            last_name="Girnar",\n            email="wardengirnar@cse.iitd.ac.in",\n            username="wardengirnar",\n            entry_no="wardengirnar",\n            type_=1,\n            password="wardengirnar",\n    )\n\n\n    db.users.insert(\n            first_name="Dean",\n            last_name="Student Welfare",\n            email="dean@cse.iitd.ac.in",\n            username="dean",\n            entry_no="dean",\n            type_=1,\n            password="dean",\n    )\n\n    ## create 3 individual courses + 2 hostel courses + 1 insti course\n    db.courses.insert(\n            name="saiesvarcourse",\n            code="saiesvarcourse",\n            description="none",\n            credits=3,\n            l_t_p="none"\n    )\n\n    db.courses.insert(\n            name="harshilcourse",\n            code="harshilcourse",\n            description="none",\n            credits=3,\n            l_t_p="none"\n    )\n\n    db.courses.insert(\n            name="nagarajucourse",\n            code="nagarajucourse",\n            description="none",\n            credits=3,\n            l_t_p="none"\n    )\n\n    db.courses.insert(\n            name="kumaoncourse",\n            code="kumaoncourse",\n            description="none",\n            credits=3,\n            l_t_p="none"\n    )\n\n    db.courses.insert(\n            name="girnarcourse",\n            code="girnarcourse",\n            description="none",\n            credits=3,\n            l_t_p="none"\n    )\n\n    db.courses.insert(\n            name="iitcourse",\n            code="iitcourse",\n            description="none",\n            credits=3,\n            l_t_p="none"\n    )\n\n\n\n    ## create 7 registered courses\n    db.registered_courses.insert(\t\n            course_id=1,\n            professor=1,\n            year_=2016,\n            semester=2,\n            starting_date=datetime(2016,1,1),\n            ending_date=datetime(2016,5,10),\n    )\n\n    db.registered_courses.insert(\n            course_id=2,\n            professor=2,\n            year_=2016,\n            semester=2,\n            starting_date=datetime(2016,1,1),\n            ending_date=datetime(2016,5,10),\n    )\n\n    db.registered_courses.insert(\n            course_id=3,\n            professor=3,\n            year_=2016,\n            semester=2,\n            starting_date=datetime(2016,1,1),\n            ending_date=datetime(2016,5,10),\n    )\n\n    db.registered_courses.insert(\n            course_id=4,\n            professor=4,\n            year_=2016,\n            semester=2,\n            starting_date=datetime(2016,1,1),\n            ending_date=datetime(2016,5,10),\n    )\n\n    db.registered_courses.insert(\n            course_id=5,\n            professor=5,\n            year_=2016,\n            semester=2,\n            starting_date=datetime(2016,1,1),\n            ending_date=datetime(2016,5,10),\n    )\n\n    db.registered_courses.insert(\n            course_id=6,\n            professor=6,\n            year_=2016,\n            semester=2,\n            starting_date=datetime(2016,1,1),\n            ending_date=datetime(2016,5,10),\n    )\n\n\n    ## register 3 students for 5 courses each out of 7 registered courses\n    db.student_registrations.insert(student_id=1,registered_course_id=4)\n    db.student_registrations.insert(student_id=2,registered_course_id=5)\n    db.student_registrations.insert(student_id=3,registered_course_id=5)\n    db.student_registrations.insert(student_id=1,registered_course_id=6)\n    db.student_registrations.insert(student_id=2,registered_course_id=6)\n    db.student_registrations.insert(student_id=3,registered_course_id=6)\n\n\n\n    ## Create Static Variables\n    db.static_vars.insert(\n            name="current_year",\n            int_value=2016,\n            string_value="2016"\n    )\n\n    db.static_vars.insert(\n            name="current_sem",\n            int_value=2,\n            string_value="2"\n    )\n\ndef api():\n    return """\nMoodle Plus API (ver 1.0)\n-------------------------\n\nUrl: /default/login.json\nInput params:\n    userid: (string)\n    password: (string)\nOutput params:\n    success: (boolean) True if login success and False otherwise\n    user: (json) User details if login is successful otherwise False\n\n\nUrl: /default/logout.json\nInput params:\nOutput params:\n    success: (boolean) True if logout successful and False otherwise\n\n\nUrl: /courses/list.json\nInput params:\nOutput params:\n    current_year: (int)\n    current_sem: (int) 0 for summer, 1 break, 2 winter\n    courses: (List) list of courses\n    user: (dictionary) user details\n\nUrl: /threads/new.json\nInput params:\n    title: (string) can\'t be empty\n    description: (string) can\'t be empty\n    course_code: (string) must be a registered courses\nOutput params:\n    success: (bool) True or False depending on whether thread was posted\n    thread_id: (bool) id of new thread created\n\n    """\n\nresponse._vars=response._caller(post_comment)\n'
+p7
+sS'snapshot'
+p8
+(dp9
+S'exception'
+p10
+(dp11
+S'__module__'
+p12
+S"'sqlite3'"
+p13
+sS'__getslice__'
+p14
+S"<method-wrapper '__getslice__' of IntegrityError object>"
+p15
+sS'__str__'
+p16
+S"<method-wrapper '__str__' of IntegrityError object>"
+p17
+sS'__reduce__'
+p18
+S'<built-in method __reduce__ of IntegrityError object>'
+p19
+sS'__dict__'
+p20
+S'{}'
+p21
+sS'__sizeof__'
+p22
+S'<built-in method __sizeof__ of IntegrityError object>'
+p23
+sS'__weakref__'
+p24
+S'None'
+p25
+sS'__init__'
+p26
+S"<method-wrapper '__init__' of IntegrityError object>"
+p27
+sS'__setattr__'
+p28
+S"<method-wrapper '__setattr__' of IntegrityError object>"
+p29
+sS'__reduce_ex__'
+p30
+S'<built-in method __reduce_ex__ of IntegrityError object>'
+p31
+sS'__new__'
+p32
+S'<built-in method __new__ of type object>'
+p33
+sS'__format__'
+p34
+S'<built-in method __format__ of IntegrityError object>'
+p35
+sS'__class__'
+p36
+S"<class 'sqlite3.IntegrityError'>"
+p37
+sS'__doc__'
+p38
+S'None'
+p39
+sS'__getitem__'
+p40
+S"<method-wrapper '__getitem__' of IntegrityError object>"
+p41
+sS'__setstate__'
+p42
+S'<built-in method __setstate__ of IntegrityError object>'
+p43
+sS'__getattribute__'
+p44
+S"<method-wrapper '__getattribute__' of IntegrityError object>"
+p45
+sS'args'
+p46
+S"('foreign key constraint failed',)"
+p47
+sS'__subclasshook__'
+p48
+S'<built-in method __subclasshook__ of type object>'
+p49
+sS'__unicode__'
+p50
+S'<built-in method __unicode__ of IntegrityError object>'
+p51
+sS'__delattr__'
+p52
+S"<method-wrapper '__delattr__' of IntegrityError object>"
+p53
+sS'__repr__'
+p54
+S"<method-wrapper '__repr__' of IntegrityError object>"
+p55
+sS'__hash__'
+p56
+S"<method-wrapper '__hash__' of IntegrityError object>"
+p57
+ssS'evalue'
+p58
+S'foreign key constraint failed'
+p59
+sS'request'
+p60
+cgluon.html
+XML_unpickle
+p61
+(S's\x1cy\x00\x00<div><table><tr><td style="font-weight:bold;vertical-align:top;">ajax</td><td style="vertical-align:top;">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">application</td><td style="vertical-align:top;">:</td><td><div>MoodlePlus</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">args</td><td style="vertical-align:top;">:</td><td><div><table></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">cid</td><td style="vertical-align:top;">:</td><td><div>None</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">client</td><td style="vertical-align:top;">:</td><td><div>127.0.0.1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">controller</td><td style="vertical-align:top;">:</td><td><div>default</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">cookies</td><td style="vertical-align:top;">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top;">gsScrollPos</td><td style="vertical-align:top;">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top;">comment</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">domain</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">expires</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">httponly</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">max-age</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">path</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">secure</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">version</td><td style="vertical-align:top;">:</td><td><div></div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">session_id_admin</td><td style="vertical-align:top;">:</td><td><div>127.0.0.1-3797e190-b371-4f88-8b0b-6eaa35bee898<table><tr><td style="font-weight:bold;vertical-align:top;">comment</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">domain</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">expires</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">httponly</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">max-age</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">path</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">secure</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">version</td><td style="vertical-align:top;">:</td><td><div></div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">session_id_complaint</td><td style="vertical-align:top;">:</td><td><div>127.0.0.1-a70b15a1-8dcc-4947-bacb-a8162eb5c6c9<table><tr><td style="font-weight:bold;vertical-align:top;">comment</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">domain</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">expires</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">httponly</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">max-age</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">path</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">secure</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">version</td><td style="vertical-align:top;">:</td><td><div></div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">session_id_complaints</td><td style="vertical-align:top;">:</td><td><div>127.0.0.1-140ebe9e-9363-47d2-b3f2-d438a8ae13c6<table><tr><td style="font-weight:bold;vertical-align:top;">comment</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">domain</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">expires</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">httponly</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">max-age</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">path</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">secure</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">version</td><td style="vertical-align:top;">:</td><td><div></div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">session_id_moodleplus</td><td style="vertical-align:top;">:</td><td><div>127.0.0.1-5167e9ac-afd8-45ad-9f50-e1fd8e69eece<table><tr><td style="font-weight:bold;vertical-align:top;">comment</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">domain</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">expires</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">httponly</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">max-age</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">path</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">secure</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">version</td><td style="vertical-align:top;">:</td><td><div></div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">session_id_welcome</td><td style="vertical-align:top;">:</td><td><div>127.0.0.1-90cf6861-569e-42d5-8bbc-f7fd3e6462f6<table><tr><td style="font-weight:bold;vertical-align:top;">comment</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">domain</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">expires</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">httponly</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">max-age</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">path</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">secure</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">version</td><td style="vertical-align:top;">:</td><td><div></div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">toShowIxigo</td><td style="vertical-align:top;">:</td><td><div>1<table><tr><td style="font-weight:bold;vertical-align:top;">comment</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">domain</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">expires</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">httponly</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">max-age</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">path</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">secure</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">version</td><td style="vertical-align:top;">:</td><td><div></div></td></tr></table></div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">env</td><td style="vertical-align:top;">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top;">HTTP_ACCEPT</td><td style="vertical-align:top;">:</td><td><div>text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">HTTP_ACCEPT_ENCODING</td><td style="vertical-align:top;">:</td><td><div>gzip, deflate, sdch</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">HTTP_ACCEPT_LANGUAGE</td><td style="vertical-align:top;">:</td><td><div>en-US,en;q=0.8</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">HTTP_ALEXATOOLBAR_ALX_NS_PH</td><td style="vertical-align:top;">:</td><td><div>AlexaToolbar/alxg-3.3</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">HTTP_CACHE_CONTROL</td><td style="vertical-align:top;">:</td><td><div>max-age=0</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">HTTP_CONNECTION</td><td style="vertical-align:top;">:</td><td><div>keep-alive</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">HTTP_COOKIE</td><td style="vertical-align:top;">:</td><td><div>toShowIxigo=1; gsScrollPos=; session_id_complaints=127.0.0.1-140ebe9e-9363-47d2-b3f2-d438a8ae13c6; session_id_complaint=127.0.0.1-a70b15a1-8dcc-4947-bacb-a8162eb5c6c9; session_id_welcome=127.0.0.1-90cf6861-569e-42d5-8bbc-f7fd3e6462f6; session_id_moodleplus=127.0.0.1-5167e9ac-afd8-45ad-9f50-e1fd8e69eece; session_id_admin=127.0.0.1-3797e190-b371-4f88-8b0b-6eaa35bee898</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">HTTP_HOST</td><td style="vertical-align:top;">:</td><td><div>127.0.0.1:8000</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">HTTP_SAVE_DATA</td><td style="vertical-align:top;">:</td><td><div>on</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">HTTP_UPGRADE_INSECURE_REQUESTS</td><td style="vertical-align:top;">:</td><td><div>1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">HTTP_USER_AGENT</td><td style="vertical-align:top;">:</td><td><div>Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.87 Safari/537.36</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">PATH_INFO</td><td style="vertical-align:top;">:</td><td><div>/post_comment.json</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">QUERY_STRING</td><td style="vertical-align:top;">:</td><td><div>complaint_id=14&amp;description=unkudos</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">REMOTE_ADDR</td><td style="vertical-align:top;">:</td><td><div>127.0.0.1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">REMOTE_PORT</td><td style="vertical-align:top;">:</td><td><div>31948</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">REQUEST_METHOD</td><td style="vertical-align:top;">:</td><td><div>GET</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">SCRIPT_NAME</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">SERVER_NAME</td><td style="vertical-align:top;">:</td><td><div>admin</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">SERVER_PORT</td><td style="vertical-align:top;">:</td><td><div>8000</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">SERVER_PROTOCOL</td><td style="vertical-align:top;">:</td><td><div>HTTP/1.1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">SERVER_SOFTWARE</td><td style="vertical-align:top;">:</td><td><div>Rocket 1.2.6</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">app_folders</td><td style="vertical-align:top;">:</td><td><div>set([&#x27;C:\\\\Users\\\\Harshil\\\\Desktop\\\\Acads\\\\COP 290\\\\Assignment 1\\\\moodle-plus\\\\applications\\\\MoodlePlus\\\\&#x27;, &#x27;C:\\\\Users\\\\Harshil\\\\Desktop\\\\Acads\\\\COP 290\\\\Assignment 1\\\\moodle-plus\\\\applications\\\\welcome\\\\&#x27;, &#x27;C:\\\\Users\\\\Harshil\\\\Desktop\\\\Acads\\\\COP 290\\\\Assignment 1\\\\moodle-plus\\\\applications\\\\admin\\\\&#x27;])</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">applications_parent</td><td style="vertical-align:top;">:</td><td><div>C:\\Users\\Harshil\\Desktop\\Acads\\COP 290\\Assignment 1\\moodle-plus</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">cmd_args</td><td style="vertical-align:top;">:</td><td><div><table></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">cmd_options</td><td style="vertical-align:top;">:</td><td><div>&lt;Values at 0x2092300: {&#x27;verbose&#x27;: False, &#x27;ip&#x27;: &#x27;127.0.0.1&#x27;, &#x27;debuglevel&#x27;: 30, &#x27;with_scheduler&#x27;: False, &#x27;ips&#x27;: [&#x27;fe80::10e6:2d1a:f53f:d107%7&#x27;, &#x27;10.192.46.248&#x27;, &#x27;fe80::840:2412:40d7:393f%5&#x27;, &#x27;fe80::c977:e3a8:3196:b8a7%18&#x27;, &#x27;2001:0:5ef5:79fb:10e6:2d1a:f53f:d107&#x27;, &#x27;192.168.56.1&#x27;], &#x27;shutdown_timeout&#x27;: 5, &#x27;taskbar&#x27;: False, &#x27;with_coverage&#x27;: False, &#x27;scheduler_groups&#x27;: None, &#x27;port&#x27;: 8000, &#x27;maxthreads&#x27;: None, &#x27;softcron&#x27;: False, &#x27;server_name&#x27;: &#x27;admin&#x27;, &#x27;bpython&#x27;: False, &#x27;nogui&#x27;: False, &#x27;pid_filename&#x27;: &#x27;httpserver.pid&#x27;, &#x27;print_errors&#x27;: False, &#x27;extcron&#x27;: False, &#x27;runcron&#x27;: False, &#x27;run_system_tests&#x27;: False, &#x27;test&#x27;: None, &#x27;folder&#x27;: &#x27;C:\\\\Users\\\\Harshil\\\\Desktop\\\\Acads\\\\COP 290\\\\Assignment 1\\\\moodle-plus&#x27;, &#x27;config&#x27;: &#x27;&#x27;, &#x27;minthreads&#x27;: None, &#x27;shell&#x27;: None, &#x27;run&#x27;: &#x27;&#x27;, &#x27;log_filename&#x27;: &#x27;httpserver.log&#x27;, &#x27;profiler_dir&#x27;: None, &#x27;args&#x27;: [&#x27;&#x27;], &#x27;socket_timeout&#x27;: 5, &#x27;ssl_ca_certificate&#x27;: None, &#x27;scheduler&#x27;: None, &#x27;interfaces&#x27;: None, &#x27;ssl_private_key&#x27;: &#x27;&#x27;, &#x27;gae&#x27;: None, &#x27;password&#x27;: &#x27;&lt;ask&gt;&#x27;, &#x27;request_queue_size&#x27;: 5, &#x27;ssl_certificate&#x27;: &#x27;&#x27;, &#x27;cronjob&#x27;: False, &#x27;numthreads&#x27;: None, &#x27;quiet&#x27;: False, &#x27;import_models&#x27;: False, &#x27;timeout&#x27;: 10, &#x27;plain&#x27;: False, &#x27;nobanner&#x27;: False}&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">db_sessions</td><td style="vertical-align:top;">:</td><td><div>set([])</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">debugging</td><td style="vertical-align:top;">:</td><td><div>True</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">gluon_parent</td><td style="vertical-align:top;">:</td><td><div>C:\\Users\\Harshil\\Desktop\\Acads\\COP 290\\Assignment 1\\moodle-plus</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">http_accept</td><td style="vertical-align:top;">:</td><td><div>text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">http_accept_encoding</td><td style="vertical-align:top;">:</td><td><div>gzip, deflate, sdch</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">http_accept_language</td><td style="vertical-align:top;">:</td><td><div>en-US,en;q=0.8</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">http_alexatoolbar_alx_ns_ph</td><td style="vertical-align:top;">:</td><td><div>AlexaToolbar/alxg-3.3</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">http_cache_control</td><td style="vertical-align:top;">:</td><td><div>max-age=0</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">http_connection</td><td style="vertical-align:top;">:</td><td><div>keep-alive</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">http_cookie</td><td style="vertical-align:top;">:</td><td><div>toShowIxigo=1; gsScrollPos=; session_id_complaints=127.0.0.1-140ebe9e-9363-47d2-b3f2-d438a8ae13c6; session_id_complaint=127.0.0.1-a70b15a1-8dcc-4947-bacb-a8162eb5c6c9; session_id_welcome=127.0.0.1-90cf6861-569e-42d5-8bbc-f7fd3e6462f6; session_id_moodleplus=127.0.0.1-5167e9ac-afd8-45ad-9f50-e1fd8e69eece; session_id_admin=127.0.0.1-3797e190-b371-4f88-8b0b-6eaa35bee898</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">http_host</td><td style="vertical-align:top;">:</td><td><div>127.0.0.1:8000</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">http_save_data</td><td style="vertical-align:top;">:</td><td><div>on</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">http_upgrade_insecure_requests</td><td style="vertical-align:top;">:</td><td><div>1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">http_user_agent</td><td style="vertical-align:top;">:</td><td><div>Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.87 Safari/537.36</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">is_jython</td><td style="vertical-align:top;">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">is_pypy</td><td style="vertical-align:top;">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">is_source</td><td style="vertical-align:top;">:</td><td><div>True</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">local_hosts</td><td style="vertical-align:top;">:</td><td><div><table><tr><td><div>2001:0:5ef5:79fb:10e6:2d1a:f53f:d107</div></td></tr><tr><td><div>admin</div></td></tr><tr><td><div>::ffff:127.0.0.1</div></td></tr><tr><td><div>::1</div></td></tr><tr><td><div>fe80::10e6:2d1a:f53f:d107%7</div></td></tr><tr><td><div>10.192.46.248</div></td></tr><tr><td><div>fe80::840:2412:40d7:393f%5</div></td></tr><tr><td><div>192.168.56.1</div></td></tr><tr><td><div>127.0.0.1</div></td></tr><tr><td><div>fe80::c977:e3a8:3196:b8a7%18</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">path_info</td><td style="vertical-align:top;">:</td><td><div>/post_comment.json</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">query_string</td><td style="vertical-align:top;">:</td><td><div>complaint_id=14&amp;description=unkudos</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">remote_addr</td><td style="vertical-align:top;">:</td><td><div>127.0.0.1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">remote_port</td><td style="vertical-align:top;">:</td><td><div>31948</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">request_method</td><td style="vertical-align:top;">:</td><td><div>GET</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">request_uri</td><td style="vertical-align:top;">:</td><td><div>/MoodlePlus/default/post_comment.json?complaint_id=14&amp;description=unkudos</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">script_name</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">server_name</td><td style="vertical-align:top;">:</td><td><div>admin</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">server_port</td><td style="vertical-align:top;">:</td><td><div>8000</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">server_protocol</td><td style="vertical-align:top;">:</td><td><div>HTTP/1.1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">server_software</td><td style="vertical-align:top;">:</td><td><div>Rocket 1.2.6</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">web2py_original_uri</td><td style="vertical-align:top;">:</td><td><div>/post_comment.json?complaint_id=14&amp;description=unkudos</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">web2py_path</td><td style="vertical-align:top;">:</td><td><div>C:\\Users\\Harshil\\Desktop\\Acads\\COP 290\\Assignment 1\\moodle-plus</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">web2py_version</td><td style="vertical-align:top;">:</td><td><div>2.10.3-stable+timestamp.2015.04.02.21.42.07</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">wsgi.errors</td><td style="vertical-align:top;">:</td><td><div>&lt;open file &#x27;&lt;stderr&gt;&#x27;, mode &#x27;w&#x27; at 0x005ED0D0&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">wsgi.file_wrapper</td><td style="vertical-align:top;">:</td><td><div>&lt;class wsgiref.util.FileWrapper at 0x029731F0&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">wsgi.input</td><td style="vertical-align:top;">:</td><td><div>&lt;socket._fileobject object at 0x06AE4BB0&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">wsgi.multiprocess</td><td style="vertical-align:top;">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">wsgi.multithread</td><td style="vertical-align:top;">:</td><td><div>True</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">wsgi.run_once</td><td style="vertical-align:top;">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">wsgi.url_scheme</td><td style="vertical-align:top;">:</td><td><div>http</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">wsgi.version</td><td style="vertical-align:top;">:</td><td><div><table><tr><td><div>1</div></td></tr><tr><td><div>0</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">wsgi_errors</td><td style="vertical-align:top;">:</td><td><div>&lt;open file &#x27;&lt;stderr&gt;&#x27;, mode &#x27;w&#x27; at 0x005ED0D0&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">wsgi_file_wrapper</td><td style="vertical-align:top;">:</td><td><div>&lt;class wsgiref.util.FileWrapper at 0x029731F0&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">wsgi_input</td><td style="vertical-align:top;">:</td><td><div>&lt;socket._fileobject object at 0x06AE4BB0&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">wsgi_multiprocess</td><td style="vertical-align:top;">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">wsgi_multithread</td><td style="vertical-align:top;">:</td><td><div>True</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">wsgi_run_once</td><td style="vertical-align:top;">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">wsgi_url_scheme</td><td style="vertical-align:top;">:</td><td><div>http</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">wsgi_version</td><td style="vertical-align:top;">:</td><td><div><table><tr><td><div>1</div></td></tr><tr><td><div>0</div></td></tr></table></div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">extension</td><td style="vertical-align:top;">:</td><td><div>json</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">folder</td><td style="vertical-align:top;">:</td><td><div>C:\\Users\\Harshil\\Desktop\\Acads\\COP 290\\Assignment 1\\moodle-plus\\applications\\MoodlePlus\\</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">function</td><td style="vertical-align:top;">:</td><td><div>post_comment</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">global_settings</td><td style="vertical-align:top;">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top;">app_folders</td><td style="vertical-align:top;">:</td><td><div>set([&#x27;C:\\\\Users\\\\Harshil\\\\Desktop\\\\Acads\\\\COP 290\\\\Assignment 1\\\\moodle-plus\\\\applications\\\\MoodlePlus\\\\&#x27;, &#x27;C:\\\\Users\\\\Harshil\\\\Desktop\\\\Acads\\\\COP 290\\\\Assignment 1\\\\moodle-plus\\\\applications\\\\welcome\\\\&#x27;, &#x27;C:\\\\Users\\\\Harshil\\\\Desktop\\\\Acads\\\\COP 290\\\\Assignment 1\\\\moodle-plus\\\\applications\\\\admin\\\\&#x27;])</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">applications_parent</td><td style="vertical-align:top;">:</td><td><div>C:\\Users\\Harshil\\Desktop\\Acads\\COP 290\\Assignment 1\\moodle-plus</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">cmd_args</td><td style="vertical-align:top;">:</td><td><div><table></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">cmd_options</td><td style="vertical-align:top;">:</td><td><div>&lt;Values at 0x2092300: {&#x27;verbose&#x27;: False, &#x27;ip&#x27;: &#x27;127.0.0.1&#x27;, &#x27;debuglevel&#x27;: 30, &#x27;with_scheduler&#x27;: False, &#x27;ips&#x27;: [&#x27;fe80::10e6:2d1a:f53f:d107%7&#x27;, &#x27;10.192.46.248&#x27;, &#x27;fe80::840:2412:40d7:393f%5&#x27;, &#x27;fe80::c977:e3a8:3196:b8a7%18&#x27;, &#x27;2001:0:5ef5:79fb:10e6:2d1a:f53f:d107&#x27;, &#x27;192.168.56.1&#x27;], &#x27;shutdown_timeout&#x27;: 5, &#x27;taskbar&#x27;: False, &#x27;with_coverage&#x27;: False, &#x27;scheduler_groups&#x27;: None, &#x27;port&#x27;: 8000, &#x27;maxthreads&#x27;: None, &#x27;softcron&#x27;: False, &#x27;server_name&#x27;: &#x27;admin&#x27;, &#x27;bpython&#x27;: False, &#x27;nogui&#x27;: False, &#x27;pid_filename&#x27;: &#x27;httpserver.pid&#x27;, &#x27;print_errors&#x27;: False, &#x27;extcron&#x27;: False, &#x27;runcron&#x27;: False, &#x27;run_system_tests&#x27;: False, &#x27;test&#x27;: None, &#x27;folder&#x27;: &#x27;C:\\\\Users\\\\Harshil\\\\Desktop\\\\Acads\\\\COP 290\\\\Assignment 1\\\\moodle-plus&#x27;, &#x27;config&#x27;: &#x27;&#x27;, &#x27;minthreads&#x27;: None, &#x27;shell&#x27;: None, &#x27;run&#x27;: &#x27;&#x27;, &#x27;log_filename&#x27;: &#x27;httpserver.log&#x27;, &#x27;profiler_dir&#x27;: None, &#x27;args&#x27;: [&#x27;&#x27;], &#x27;socket_timeout&#x27;: 5, &#x27;ssl_ca_certificate&#x27;: None, &#x27;scheduler&#x27;: None, &#x27;interfaces&#x27;: None, &#x27;ssl_private_key&#x27;: &#x27;&#x27;, &#x27;gae&#x27;: None, &#x27;password&#x27;: &#x27;&lt;ask&gt;&#x27;, &#x27;request_queue_size&#x27;: 5, &#x27;ssl_certificate&#x27;: &#x27;&#x27;, &#x27;cronjob&#x27;: False, &#x27;numthreads&#x27;: None, &#x27;quiet&#x27;: False, &#x27;import_models&#x27;: False, &#x27;timeout&#x27;: 10, &#x27;plain&#x27;: False, &#x27;nobanner&#x27;: False}&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">db_sessions</td><td style="vertical-align:top;">:</td><td><div>set([])</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">debugging</td><td style="vertical-align:top;">:</td><td><div>True</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">gluon_parent</td><td style="vertical-align:top;">:</td><td><div>C:\\Users\\Harshil\\Desktop\\Acads\\COP 290\\Assignment 1\\moodle-plus</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">is_jython</td><td style="vertical-align:top;">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">is_pypy</td><td style="vertical-align:top;">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">is_source</td><td style="vertical-align:top;">:</td><td><div>True</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">local_hosts</td><td style="vertical-align:top;">:</td><td><div><table><tr><td><div>2001:0:5ef5:79fb:10e6:2d1a:f53f:d107</div></td></tr><tr><td><div>admin</div></td></tr><tr><td><div>::ffff:127.0.0.1</div></td></tr><tr><td><div>::1</div></td></tr><tr><td><div>fe80::10e6:2d1a:f53f:d107%7</div></td></tr><tr><td><div>10.192.46.248</div></td></tr><tr><td><div>fe80::840:2412:40d7:393f%5</div></td></tr><tr><td><div>192.168.56.1</div></td></tr><tr><td><div>127.0.0.1</div></td></tr><tr><td><div>fe80::c977:e3a8:3196:b8a7%18</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">web2py_version</td><td style="vertical-align:top;">:</td><td><div>2.10.3-stable+timestamp.2015.04.02.21.42.07</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">is_https</td><td style="vertical-align:top;">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">is_local</td><td style="vertical-align:top;">:</td><td><div>True</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">is_restful</td><td style="vertical-align:top;">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">is_sheduler</td><td style="vertical-align:top;">:</td><td><div>None</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">is_shell</td><td style="vertical-align:top;">:</td><td><div>None</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">now</td><td style="vertical-align:top;">:</td><td><div>datetime.datetime(2016, 3, 27, 18, 22, 51, 486000)</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">url</td><td style="vertical-align:top;">:</td><td><div>/post_comment.json</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">utcnow</td><td style="vertical-align:top;">:</td><td><div>datetime.datetime(2016, 3, 27, 12, 52, 51, 486000)</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">uuid</td><td style="vertical-align:top;">:</td><td><div>MoodlePlus/127.0.0.1.2016-03-27.18-22-51.97c5a6ed-8468-4c08-b9cb-5ffb0cf210dc</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">wsgi</td><td style="vertical-align:top;">:</td><td><div>&lt;gluon.main.LazyWSGI object at 0x0701DBD0&gt;</div></td></tr></table></div>'
+tRp62
+sS'frames'
+p63
+(lp64
+(dp65
+S'file'
+p66
+S'C:\\Users\\Harshil\\Desktop\\Acads\\COP 290\\Assignment 1\\moodle-plus\\gluon\\restricted.py'
+p67
+sS'dump'
+p68
+(dp69
+S'environment'
+p70
+S"{'A': <class 'gluon.html.A'>, 'ANY_OF': <class 'gluon.validators.ANY_OF'>, 'ASSIGNJS': <function ASSIGNJS>, 'AppConfig': <function AppConfig>, 'Auth': <class 'gluon.tools.Auth'>, 'B': <class 'gluon.html.B'>, 'BEAUTIFY': <class 'gluon.html.BEAUTIFY'>, 'BODY': <class 'gluon.html.BODY'>, 'BR': <class 'gluon.html.BR'>, 'BUTTON': <class 'gluon.html.BUTTON'>, ...}"
+p71
+sS'ccode'
+p72
+S'<code object <module> at 0719CF50, file "C:\\User...ions\\MoodlePlus\\controllers/default.py", line 11>'
+p73
+ssS'lnum'
+p74
+I227
+sS'lines'
+p75
+(dp76
+I224
+S'            ccode = code'
+p77
+sI225
+S'        else:'
+p78
+sI226
+S'            ccode = compile2(code, layer)'
+p79
+sI227
+S'        exec ccode in environment'
+p80
+sI228
+S'    except HTTP:'
+p81
+sI229
+S'        raise'
+p82
+sI230
+S'    except RestrictedError:'
+p83
+sI231
+S'        # do not encapsulate (obfuscate) the original RestrictedError'
+p84
+sI222
+S'    try:'
+p85
+sI223
+S'        if isinstance(code, types.CodeType):'
+p86
+ssS'call'
+p87
+S'(code=\'# -*- coding: utf-8 -*-\\n# this file is released ..."\\n\\nresponse._vars=response._caller(post_comment)\\n\', environment={\'A\': <class \'gluon.html.A\'>, \'ANY_OF\': <class \'gluon.validators.ANY_OF\'>, \'ASSIGNJS\': <function ASSIGNJS>, \'AppConfig\': <function AppConfig>, \'Auth\': <class \'gluon.tools.Auth\'>, \'B\': <class \'gluon.html.B\'>, \'BEAUTIFY\': <class \'gluon.html.BEAUTIFY\'>, \'BODY\': <class \'gluon.html.BODY\'>, \'BR\': <class \'gluon.html.BR\'>, \'BUTTON\': <class \'gluon.html.BUTTON\'>, ...}, layer=r\'C:\\Users\\Harshil\\Desktop\\Acads\\COP 290\\Assignmen...us\\applications\\MoodlePlus\\controllers/default.py\')'
+p88
+sS'func'
+p89
+S'restricted'
+p90
+sa(dp91
+g66
+S'C:\\Users\\Harshil\\Desktop\\Acads\\COP 290\\Assignment 1\\moodle-plus\\applications\\MoodlePlus\\controllers\\default.py'
+p92
+sg68
+(dp93
+sg74
+I426
+sg75
+(dp94
+I416
+S'Input params:'
+p95
+sI417
+S"    title: (string) can't be empty"
+p96
+sI418
+S"    description: (string) can't be empty"
+p97
+sI419
+S'    course_code: (string) must be a registered courses'
+p98
+sI420
+S'Output params:'
+p99
+sI421
+S'    success: (bool) True or False depending on whether thread was posted'
+p100
+sI422
+S'    thread_id: (bool) id of new thread created'
+p101
+sI423
+S''
+sI424
+S'    """'
+p102
+sI415
+S'Url: /threads/new.json'
+p103
+ssg87
+S'()'
+p104
+sg89
+S'<module>'
+p105
+sa(dp106
+g66
+S'C:\\Users\\Harshil\\Desktop\\Acads\\COP 290\\Assignment 1\\moodle-plus\\gluon\\globals.py'
+p107
+sg68
+(dp108
+S'self'
+p109
+S'undefined'
+p110
+sS'f'
+S'<function post_comment>'
+p111
+ssg74
+I393
+sg75
+(dp112
+I388
+S"        self.flash = ''            # used by the default view layout"
+p113
+sI389
+S'        self.meta = Storage()      # used by web2py_ajax.html'
+p114
+sI390
+S'        self.menu = []             # used by the default view layout'
+p115
+sI391
+S'        self.files = []            # used by web2py_ajax.html'
+p116
+sI392
+S'        self._vars = None'
+p117
+sI393
+S'        self._caller = lambda f: f()'
+p118
+sI394
+S'        self._view_environment = None'
+p119
+sI395
+S'        self._custom_commit = None'
+p120
+sI396
+S'        self._custom_rollback = None'
+p121
+sI397
+S"        self.generic_patterns = ['*']"
+p122
+ssg87
+S'(f=<function post_comment>)'
+p123
+sg89
+S'<lambda>'
+p124
+sa(dp125
+g66
+S'C:\\Users\\Harshil\\Desktop\\Acads\\COP 290\\Assignment 1\\moodle-plus\\gluon\\tools.py'
+p126
+sg68
+(dp127
+S'action'
+p128
+S'<function post_comment>'
+p129
+sS'a'
+S'()'
+p130
+sS'b'
+g21
+ssg74
+I3440
+sg75
+(dp131
+I3435
+S'                    flag = condition'
+p132
+sI3436
+S'                if not flag:'
+p133
+sI3437
+S'                    current.session.flash = self.messages.access_denied'
+p134
+sI3438
+S'                    return call_or_redirect('
+p135
+sI3439
+S'                        self.settings.on_failed_authorization)'
+p136
+sI3440
+S'                return action(*a, **b)'
+p137
+sI3441
+S'            f.__doc__ = action.__doc__'
+p138
+sI3442
+S'            f.__name__ = action.__name__'
+p139
+sI3443
+S'            f.__dict__.update(action.__dict__)'
+p140
+sI3444
+S'            return f'
+p141
+ssg87
+S'(*a=(), **b={})'
+p142
+sg89
+S'f'
+sa(dp143
+g66
+S'C:\\Users\\Harshil\\Desktop\\Acads\\COP 290\\Assignment 1\\moodle-plus\\applications\\MoodlePlus\\controllers\\default.py'
+p144
+sg68
+(dp145
+S'auth.user.id'
+p146
+S'9L'
+p147
+sS'user_id'
+p148
+g110
+sS'description'
+p149
+g110
+sS'cid'
+p150
+S'14'
+p151
+sS'auth.user'
+p152
+S"<Row {'username': 'cs1140222', 'first_name': 'Ha... 'registration_key': '', 'id': 9L, 'hostel': 1L}>"
+p153
+sS'comment_id'
+p154
+g110
+sS'global auth'
+p155
+S'<gluon.tools.Auth object>'
+p156
+sS'complaint_id'
+p157
+g110
+sS'db.compcomm'
+p158
+S'<Table compcomm (id,complaint_id,user_id,description,created_at)>'
+p159
+sS'global db'
+p160
+S'<DAL uri="sqlite://storage.sqlite">'
+p161
+sS'db.compcomm.insert'
+p162
+S'<bound method Table.insert of <Table compcomm (id,complaint_id,user_id,description,created_at)>>'
+p163
+sS'desc'
+p164
+S"'unkudos'"
+p165
+ssg74
+I175
+sg75
+(dp166
+I170
+S'        raise e'
+p167
+sI171
+S'    try:'
+p168
+sI172
+S'        desc = str(request.vars["description"])'
+p169
+sI173
+S'    except Exception, e:'
+p170
+sI174
+S'        raise e'
+p171
+sI175
+S'    comment_id = db.compcomm.insert(complaint_id=cid, user_id=auth.user.id, description=desc)'
+p172
+sI176
+S'    comment = db(db.compcomm.id==comment_id).select().first()'
+p173
+sI177
+S'    return dict(success=True, comment=comment, user_name=(auth.user.first_name+" "+auth.user.last_name).title(), time_readable=timeHuman(comment.created_at), user=auth.user)'
+p174
+sI178
+S''
+sI179
+S"###EDIT's end###"
+p175
+ssg87
+S'()'
+p176
+sg89
+S'post_comment'
+p177
+sa(dp178
+g66
+S'C:\\Users\\Harshil\\Desktop\\Acads\\COP 290\\Assignment 1\\moodle-plus\\gluon\\packages\\dal\\pydal\\objects.py'
+p179
+sg68
+(dp180
+S'self._listify'
+p181
+S'<bound method Table._listify of <Table compcomm (id,complaint_id,user_id,description,created_at)>>'
+p182
+sS'fields'
+p183
+S"{'complaint_id': 14, 'created_at': <built-in method now of type object>, 'description': 'unkudos', 'user_id': 9L}"
+p184
+sS'self'
+p185
+S'<Table compcomm (id,complaint_id,user_id,description,created_at)>'
+p186
+sS'ret'
+p187
+g110
+sS'self._db._adapter'
+p188
+S'<pydal.adapters.sqlite.SQLiteAdapter object>'
+p189
+sS'self._db._adapter.insert'
+p190
+S'<bound method SQLiteAdapter.insert of <pydal.adapters.sqlite.SQLiteAdapter object>>'
+p191
+sS'self._db'
+p192
+S'<DAL uri="sqlite://storage.sqlite">'
+p193
+ssg74
+I745
+sg75
+(dp194
+I740
+S''
+sI741
+S'    def insert(self, **fields):'
+p195
+sI742
+S'        fields = self._defaults(fields)'
+p196
+sI743
+S'        self._attempt_upload(fields)'
+p197
+sI744
+S'        if any(f(fields) for f in self._before_insert): return 0'
+p198
+sI745
+S'        ret =  self._db._adapter.insert(self, self._listify(fields))'
+p199
+sI746
+S'        if ret and self._after_insert:'
+p200
+sI747
+S'            fields = Row(fields)'
+p201
+sI748
+S'            [f(fields,ret) for f in self._after_insert]'
+p202
+sI749
+S'        return ret'
+p203
+ssg87
+S"(self=<Table compcomm (id,complaint_id,user_id,description,created_at)>, **fields={'complaint_id': 14, 'created_at': <built-in method now of type object>, 'description': 'unkudos', 'user_id': 9L})"
+p204
+sg89
+S'insert'
+p205
+sa(dp206
+g66
+S'C:\\Users\\Harshil\\Desktop\\Acads\\COP 290\\Assignment 1\\moodle-plus\\gluon\\packages\\dal\\pydal\\adapters\\base.py'
+p207
+sg68
+(dp208
+S'e'
+S"IntegrityError('foreign key constraint failed',)"
+p209
+ssg74
+I727
+sg75
+(dp210
+I722
+S'            self.execute(query)'
+p211
+sI723
+S'        except Exception:'
+p212
+sI724
+S'            e = sys.exc_info()[1]'
+p213
+sI725
+S"            if hasattr(table,'_on_insert_error'):"
+p214
+sI726
+S'                return table._on_insert_error(table,fields,e)'
+p215
+sI727
+S'            raise e'
+p216
+sI728
+S"        if hasattr(table, '_primarykey'):"
+p217
+sI729
+S'            mydict = dict([(k[0].name, k[1]) for k in fields if k[0].name in table._primarykey])'
+p218
+sI730
+S'            if mydict != {}:'
+p219
+sI731
+S'                return mydict'
+p220
+ssg87
+S"(self=<pydal.adapters.sqlite.SQLiteAdapter object>, table=<Table compcomm (id,complaint_id,user_id,description,created_at)>, fields=[(<pydal.objects.Field object>, 14), (<pydal.objects.Field object>, <built-in method now of type object>), (<pydal.objects.Field object>, 9L), (<pydal.objects.Field object>, 'unkudos')])"
+p221
+sg89
+g205
+sasS'pyver'
+p222
+S'Python 2.7.9: C:\\Users\\Harshil\\Desktop\\Acads\\COP 290\\Assignment 1\\moodle-plus\\web2py.exe (prefix: C:\\Python27)'
+p223
+sS'session'
+p224
+g61
+(S's \x0b\x00\x00<div><table><tr><td style="font-weight:bold;vertical-align:top;">auth</td><td style="vertical-align:top;">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top;">expiration</td><td style="vertical-align:top;">:</td><td><div>3600</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">hmac_key</td><td style="vertical-align:top;">:</td><td><div>2b00e5f5-9d90-4a79-aa68-d829daefa3f8</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">last_visit</td><td style="vertical-align:top;">:</td><td><div>datetime.datetime(2016, 3, 27, 18, 22, 51, 486000)</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">user</td><td style="vertical-align:top;">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top;">email</td><td style="vertical-align:top;">:</td><td><div>cs1140222@cse.iitd.ac.in</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">entry_no</td><td style="vertical-align:top;">:</td><td><div>2014CS10222</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">first_name</td><td style="vertical-align:top;">:</td><td><div>Harshil</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">hostel</td><td style="vertical-align:top;">:</td><td><div>1L</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">id</td><td style="vertical-align:top;">:</td><td><div>9L</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">last_name</td><td style="vertical-align:top;">:</td><td><div>Meena</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">registration_id</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">registration_key</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">reset_password_key</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">type_</td><td style="vertical-align:top;">:</td><td><div>0L</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">username</td><td style="vertical-align:top;">:</td><td><div>cs1140222</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">user_groups</td><td style="vertical-align:top;">:</td><td><div><table></table></div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">flash</td><td style="vertical-align:top;">:</td><td><div>None</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">last_orderby</td><td style="vertical-align:top;">:</td><td><div>None</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">last_query</td><td style="vertical-align:top;">:</td><td><div>db.complaints.id&gt;0</div></td></tr></table></div>'
+tRp225
+sS'etype'
+p226
+S"<class 'sqlite3.IntegrityError'>"
+p227
+sS'date'
+p228
+S'Sun Mar 27 18:22:51 2016'
+p229
+sS'response'
+p230
+g61
+(S's\xe2\x1e\x00\x00<div><table><tr><td style="font-weight:bold;vertical-align:top;">body</td><td style="vertical-align:top;">:</td><td><div>&lt;cStringIO.StringO object at 0x0701D840&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">cookies</td><td style="vertical-align:top;">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top;">session_id_moodleplus</td><td style="vertical-align:top;">:</td><td><div>127.0.0.1-5167e9ac-afd8-45ad-9f50-e1fd8e69eece<table><tr><td style="font-weight:bold;vertical-align:top;">comment</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">domain</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">expires</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">httponly</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">max-age</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">path</td><td style="vertical-align:top;">:</td><td><div>/</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">secure</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">version</td><td style="vertical-align:top;">:</td><td><div></div></td></tr></table></div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">delimiters</td><td style="vertical-align:top;">:</td><td><div><table><tr><td><div>{{</div></td></tr><tr><td><div>}}</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">files</td><td style="vertical-align:top;">:</td><td><div><table></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">flash</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">form_label_separator</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">formstyle</td><td style="vertical-align:top;">:</td><td><div>bootstrap3_inline</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">generic_patterns</td><td style="vertical-align:top;">:</td><td><div><table><tr><td><div>*</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">google_analytics_id</td><td style="vertical-align:top;">:</td><td><div>None</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">headers</td><td style="vertical-align:top;">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top;">X-Powered-By</td><td style="vertical-align:top;">:</td><td><div>web2py</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">logo</td><td style="vertical-align:top;">:</td><td><div><a class="navbar-brand" href="/" id="web2py-logo"><b>Moodle&nbsp;<span>Plus</span></b>&trade;&nbsp;</a></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">menu</td><td style="vertical-align:top;">:</td><td><div><table><tr><td><div><table><tr><td><div>Home</div></td></tr><tr><td><div>False</div></td></tr><tr><td><div>/index.json</div></td></tr><tr><td><div><table></table></div></td></tr></table></div></td></tr><tr><td><div><table><tr><td><div>My Course</div></td></tr><tr><td><div>False</div></td></tr><tr><td><div>/courses/index.json</div></td></tr><tr><td><div><table></table></div></td></tr></table></div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">meta</td><td style="vertical-align:top;">:</td><td><div><table><tr><td style="font-weight:bold;vertical-align:top;">author</td><td style="vertical-align:top;">:</td><td><div>Your Name &lt;you@example.com&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">description</td><td style="vertical-align:top;">:</td><td><div>a cool new app</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">generator</td><td style="vertical-align:top;">:</td><td><div>Web2py Web Framework</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">keywords</td><td style="vertical-align:top;">:</td><td><div>web2py, python, framework</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">models_to_run</td><td style="vertical-align:top;">:</td><td><div><table><tr><td><div>^\\w+\\.py$</div></td></tr><tr><td><div>^default/\\w+\\.py$</div></td></tr><tr><td><div>^default/post_comment/\\w+\\.py$</div></td></tr></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">postprocessing</td><td style="vertical-align:top;">:</td><td><div><table></table></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">session_client</td><td style="vertical-align:top;">:</td><td><div>127.0.0.1</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">session_cookie_compression_level</td><td style="vertical-align:top;">:</td><td><div>None</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">session_cookie_expires</td><td style="vertical-align:top;">:</td><td><div>None</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">session_cookie_key</td><td style="vertical-align:top;">:</td><td><div>None</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">session_data_name</td><td style="vertical-align:top;">:</td><td><div>session_data_moodleplus</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">session_file</td><td style="vertical-align:top;">:</td><td><div>&lt;open file &#x27;C:\\\\Users\\\\Harshil\\\\Desktop\\\\Acads\\\\COP 290\\\\Assignment 1\\\\moodle-plus\\\\applications\\\\MoodlePlus\\\\sessions\\\\115\\\\11f\\\\127.0.0.1-5167e9ac-afd8-45ad-9f50-e1fd8e69eece&#x27;, mode &#x27;rb+&#x27; at 0x06B53910&gt;</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">session_filename</td><td style="vertical-align:top;">:</td><td><div>C:\\Users\\Harshil\\Desktop\\Acads\\COP 290\\Assignment 1\\moodle-plus\\applications\\MoodlePlus\\sessions\\127.0.0.1-5167e9ac-afd8-45ad-9f50-e1fd8e69eece</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">session_hash</td><td style="vertical-align:top;">:</td><td><div>1cbd8f969b20f6a3ca261e653b918a5f</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">session_id</td><td style="vertical-align:top;">:</td><td><div>127.0.0.1-5167e9ac-afd8-45ad-9f50-e1fd8e69eece</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">session_id_name</td><td style="vertical-align:top;">:</td><td><div>session_id_moodleplus</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">session_locked</td><td style="vertical-align:top;">:</td><td><div>True</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">session_masterapp</td><td style="vertical-align:top;">:</td><td><div>MoodlePlus</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">session_new</td><td style="vertical-align:top;">:</td><td><div>False</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">session_storage_type</td><td style="vertical-align:top;">:</td><td><div>file</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">status</td><td style="vertical-align:top;">:</td><td><div>200</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">subtitle</td><td style="vertical-align:top;">:</td><td><div></div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">title</td><td style="vertical-align:top;">:</td><td><div>Moodleplus</div></td></tr><tr><td style="font-weight:bold;vertical-align:top;">view</td><td style="vertical-align:top;">:</td><td><div>default/post_comment.json</div></td></tr></table></div>'
+tRp231
+sS'locals'
+p232
+(dp233
+S'fields'
+p234
+S"[(<pydal.objects.Field object>, 14), (<pydal.objects.Field object>, <built-in method now of type object>), (<pydal.objects.Field object>, 9L), (<pydal.objects.Field object>, 'unkudos')]"
+p235
+sS'self'
+p236
+S'<pydal.adapters.sqlite.SQLiteAdapter object>'
+p237
+sS'e'
+S"IntegrityError('foreign key constraint failed',)"
+p238
+sS'table'
+p239
+S'<Table compcomm (id,complaint_id,user_id,description,created_at)>'
+p240
+sS'query'
+p241
+S'"INSERT INTO compcomm(complaint_id,created_at,use...n) VALUES (14,\'2016-03-27 18:22:51\',9,\'unkudos\');"'
+p242
+sssS'traceback'
+p243
+S'Traceback (most recent call last):\n  File "C:\\Users\\Harshil\\Desktop\\Acads\\COP 290\\Assignment 1\\moodle-plus\\gluon\\restricted.py", line 227, in restricted\n    exec ccode in environment\n  File "C:\\Users\\Harshil\\Desktop\\Acads\\COP 290\\Assignment 1\\moodle-plus\\applications\\MoodlePlus\\controllers/default.py", line 426, in <module>\n  File "C:\\Users\\Harshil\\Desktop\\Acads\\COP 290\\Assignment 1\\moodle-plus\\gluon\\globals.py", line 393, in <lambda>\n    self._caller = lambda f: f()\n  File "C:\\Users\\Harshil\\Desktop\\Acads\\COP 290\\Assignment 1\\moodle-plus\\gluon\\tools.py", line 3440, in f\n    return action(*a, **b)\n  File "C:\\Users\\Harshil\\Desktop\\Acads\\COP 290\\Assignment 1\\moodle-plus\\applications\\MoodlePlus\\controllers/default.py", line 175, in post_comment\n    comment_id = db.compcomm.insert(complaint_id=cid, user_id=auth.user.id, description=desc)\n  File "C:\\Users\\Harshil\\Desktop\\Acads\\COP 290\\Assignment 1\\moodle-plus\\gluon\\packages\\dal\\pydal\\objects.py", line 745, in insert\n    ret =  self._db._adapter.insert(self, self._listify(fields))\n  File "C:\\Users\\Harshil\\Desktop\\Acads\\COP 290\\Assignment 1\\moodle-plus\\gluon\\packages\\dal\\pydal\\adapters\\base.py", line 727, in insert\n    raise e\nIntegrityError: foreign key constraint failed\n'
+p244
+s.

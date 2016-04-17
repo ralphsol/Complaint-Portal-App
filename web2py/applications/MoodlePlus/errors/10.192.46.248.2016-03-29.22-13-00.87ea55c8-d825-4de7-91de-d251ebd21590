@@ -1,0 +1,21 @@
+(dp1
+S'output'
+p2
+S"<type 'exceptions.TypeError'> <gluon.validators.IS_NOT_EMPTY object at 0x07386810> is not JSON serializable"
+p3
+sS'layer'
+p4
+S'C:\\Users\\Harshil\\Desktop\\Acads\\COP 290\\Assignment 1\\moodle-plus\\applications\\MoodlePlus\\views\\generic.json'
+p5
+sS'code'
+p6
+S"from gluon.serializers import json\nresponse.write(XML(json(response._vars)))\nresponse.write('\\r\\n', escape=False)"
+p7
+sS'snapshot'
+p8
+(dp9
+sS'traceback'
+p10
+S'Traceback (most recent call last):\n  File "C:\\Users\\Harshil\\Desktop\\Acads\\COP 290\\Assignment 1\\moodle-plus\\gluon\\restricted.py", line 227, in restricted\n    exec ccode in environment\n  File "C:\\Users\\Harshil\\Desktop\\Acads\\COP 290\\Assignment 1\\moodle-plus\\applications\\MoodlePlus\\views\\generic.json", line 2, in <module>\n  File "C:\\Users\\Harshil\\Desktop\\Acads\\COP 290\\Assignment 1\\moodle-plus\\gluon\\serializers.py", line 137, in json\n    value = json_parser.dumps(value, default=default)\n  File "json/__init__.py", line 250, in dumps\n  File "json/encoder.py", line 207, in encode\n  File "json/encoder.py", line 270, in iterencode\n  File "C:\\Users\\Harshil\\Desktop\\Acads\\COP 290\\Assignment 1\\moodle-plus\\gluon\\serializers.py", line 110, in custom_json\n    raise TypeError(repr(o) + " is not JSON serializable")\nTypeError: <gluon.validators.IS_NOT_EMPTY object at 0x07386810> is not JSON serializable\n'
+p11
+s.

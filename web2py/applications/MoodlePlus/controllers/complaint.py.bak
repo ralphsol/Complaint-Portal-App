@@ -1,0 +1,19 @@
+def index():
+    return dict(message="hello from complaint.py")
+
+@auth.requires_login()
+def complaint():#return complaint with comments (input = complaint_id) ; /complaint/complaint.json/<complaint_id>
+    try:
+        cid = int(request.args[0])
+    except Exception, e:
+        raise e
+    complaints = db(db.complaints.id==cid).select().first()
+    comments, comment_users = get_comments(cid)
+    return dict(complaints=complaints, comments=comments, comment_users=comment_users)
+
+def get_comments(complaint_id):#caller function
+    comments =  db(db.comments.complaint_id==complaint_id).select()
+    comment_users = []
+    for comment in comments:
+        comment_users.append(db(db.users.id==comment.user_id).select().first())
+    return comments, comment_users

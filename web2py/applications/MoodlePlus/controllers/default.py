@@ -1,0 +1,653 @@
+# -*- coding: utf-8 -*-
+# this file is released under public domain and you can use without limitations
+
+#########################################################################
+## This is a sample controller
+## - index is the default action of any application
+## - user is required for authentication and authorization
+## - download is for downloading files uploaded in the db (does streaming)
+#########################################################################
+
+def index():
+    """
+    example action using the internationalization operator T and flash
+    rendered by views/default/index.html or views/generic.html
+
+    if you need a simple wiki simply replace the two lines below with:
+    return auth.wiki()
+    """
+    response.flash = T("Welcome on Moodle+")
+    return dict(noti_count=4)
+
+def grades():
+    grades = db(db.grades.user_id==auth.user.id).select()
+    courses = []
+    for grade in grades:
+        courses.append(db(db.courses.id==grade.registered_course_id.course_id).select().first())
+    return dict(grades=grades, courses=courses)
+
+def notifications():
+    noti = db(db.notifications.user_id==auth.user.id).select(orderby=~db.notifications.created_at)
+    db(db.notifications.user_id==auth.user.id).update(is_seen=1)
+    return dict(notifications=noti)
+
+
+def logged_in():
+    return dict(success=auth.is_logged_in(), user=auth.user)
+
+def logout():
+    return dict(success=True, loggedout=auth.logout())
+
+def user():
+    """
+    exposes:
+    http://..../[app]/default/user/login
+    http://..../[app]/default/user/logout
+    http://..../[app]/default/user/register
+    http://..../[app]/default/user/profile
+    http://..../[app]/default/user/retrieve_password
+    http://..../[app]/default/user/change_password
+    http://..../[app]/default/user/manage_users (requires membership in
+    use @auth.requires_login()
+        @auth.requires_membership('group name')
+        @auth.requires_permission('read','table name',record_id)
+    to decorate functions that need access control
+    """
+    return dict(form=auth())
+
+
+@cache.action()
+def download():
+    """
+    allows downloading of uploaded files
+    http://..../[app]/default/download/[filename]
+    """
+    return response.download(request, db)
+
+
+def call():
+    """
+    exposes services. for example:
+    http://..../[app]/default/call/jsonrpc
+    decorate with @services.jsonrpc the functions to expose
+    supports xml, json, xmlrpc, jsonrpc, amfrpc, rss, csv
+    """
+    return service()
+
+
+@request.restful()
+def api():
+    response.view = 'generic.'+request.extension
+    def GET(*args,**vars):
+        patterns = 'auto'
+        parser = db.parse_as_rest(patterns,args,vars)
+        if parser.status == 200:
+            return dict(content=parser.response)
+        else:
+            raise HTTP(parser.status,parser.error)
+    def POST(table_name,**vars):
+        return db[table_name].validate_and_insert(**vars)
+    def PUT(table_name,record_id,**vars):
+        return db(db[table_name]._id==record_id).update(**vars)
+    def DELETE(table_name,record_id):
+        return db(db[table_name]._id==record_id).delete()
+    return dict(GET=GET, POST=POST, PUT=PUT, DELETE=DELETE)
+
+def login():
+    userid = request.vars.userid
+    password = request.vars.password
+    user = auth.login_bare(userid,password)
+    return dict(success=False if not user else True, user=user)
+
+###EDIT's start###
+
+@auth.requires_login()
+def newuser():
+    if auth.user.id != 8:
+        return dict(success=False)
+    try:
+        first_name = str(request.vars["first_name"])
+    except Exception, e:
+        raise e
+    try:
+        last_name = str(request.vars["last_name"])
+    except Exception, e:
+        raise e
+    try:
+        email = str(request.vars["email"])
+    except Exception, e:
+        raise e
+    try:
+        username = str(request.vars["username"])
+    except Exception, e:
+        raise e
+    try:
+        entry_no = str(request.vars["entry_no"])
+    except Exception, e:
+        raise e
+    try:
+        type_ = str(request.vars["type_"])
+    except Exception, e:
+        raise e
+    try:
+        password = str(request.vars["password"])
+    except Exception, e:
+        raise e
+    try:
+        hostel = str(request.vars["hostel"])
+    except Exception, e:
+        raise e
+    db.users.insert(first_name=first_name,last_name=last_name,email=email,username=username,entry_no=entry_no,type_=type_,password=password,hostel=hostel)
+    return dict(success=True, val=db.users())
+
+'''
+def new_resource():
+    db.images.insert(picture = "C:\Users\Harshil\Desktop\GSoC\Proposal\id.png", picture_file="C:\Users\Harshil\Desktop\GSoC\Proposal\id.png")
+    return dict(val = db.images())
+'''
+
+@auth.requires_login()
+def new_resource():#for complaints, facing foreign key constraint failed error ; http://10.192.46.248:8000/new_resource.json?name=seqresc&file_=C:\Users\Harshil\Desktop\GSoC\Proposal\id.png
+    try:
+        name = str(request.vars["name"])
+    except Exception, e:
+        raise e
+    try:
+        file_ = str(request.vars["file_"])
+    except Exception, e:
+        raise e
+    #db.compresc.insert(name=name, file_=file("C:\Users\Harshil\Desktop\GSoC\Proposal\sequence_diagram.png") )
+    db.compresc.insert(name=name, user_id=auth.user.id, file_=file(file_) )
+    return dict(val=db.compresc())
+
+@auth.requires_login()
+def get_resource(): #resource id
+    try:
+        res_id = int(request.vars["res_id"])
+    except Exception, e:
+        raise e
+    val = None
+    for res in db(db.compresc).select():
+        if res.id==res_id:
+            val = res.file_
+    return dict(val=val)
+
+
+def complaintlist_sorted():#list of all complaints ; /complaintlist_sorted.json/<value> ; value is 0 then by upvotes ; 1 then by latest ; else normally
+    try:
+        value = int(request.args[0])
+    except Exception, e:
+        raise e
+    if value==0:
+        complaints = db(db.complaints).select(orderby=~db.complaints.upvote)
+    elif value==1:
+        complaints = db(db.complaints).select(orderby=~db.complaints.created_at)
+    else:
+        complaints = db(db.complaints).select()
+    return dict(complaints=complaints)
+
+@auth.requires_login()
+def mycomplaintlist_sorted():#list of all complaints ; /mycomplaintlist_sorted.json/<value> ; value is 0 then by upvotes ; 1 then by latest ; else normally
+    try:
+        value = int(request.args[0])
+    except Exception, e:
+        raise e
+    if value==0:
+        complaints = db(db.complaints).select(orderby=~db.complaints.upvote)
+    elif value==1:
+        complaints = db(db.complaints).select(orderby=~db.complaints.created_at)
+    else:
+        complaints = db(db.complaints).select()
+    res = []
+    for complaint in complaints:
+        if complaint.user_id==auth.user.id:
+            res.append(complaint)
+    return dict(mycomplaints=res)
+
+@auth.requires_login()
+def allcomplaintlist_sorted():#list of all complaints ; /allcomplaintlist_sorted.json/<value> ; value is 0 then by upvotes ; 1 then by latest ; else normally
+    try:
+        value = int(request.args[0])
+    except Exception, e:
+        raise e
+    if value==0:
+        complaints = db(db.complaints).select(orderby=~db.complaints.upvote)
+    elif value==1:
+        complaints = db(db.complaints).select(orderby=~db.complaints.created_at)
+    else:
+        complaints = db(db.complaints).select()
+    res = []
+    hostel = ""
+#    for user in db.users:
+#        if user.user_id==complaint.user_id:
+#            hostel = user.hostel
+    for complaint in complaints:
+        if complaint.type_==0:
+            if complaint.user_id==auth.user.id:
+                res.append(complaint)
+        elif complaint.type_==1:
+            if db(db.users.id==complaint.user_id).select().first().hostel==auth.user.hostel:
+                res.append(complaint)
+        elif complaint.type_==2:
+            res.append(complaint)
+    return dict(mycomplaints=res)
+
+def complaintlist():#list of all complaints ; /complaintlist.json
+    complaints = db(db.complaints).select()
+    return dict(complaints=complaints)
+
+def mycomplaints():
+    complaints = db(db.complaints).select()
+    res = []
+    for complaint in complaints:
+        if complaint.user_id==auth.user.id:
+            res.append(complaint)
+    return dict(mycomplaints=res)
+
+def allcomplaints():
+    complaints = db(db.complaints).select()
+    res = []
+    hostel = ""
+#    for user in db.users:
+#        if user.user_id==complaint.user_id:
+#            hostel = user.hostel
+    for complaint in complaints:
+        if complaint.type_==0:
+            if complaint.user_id==auth.user.id:
+                res.append(complaint)
+        elif complaint.type_==1:
+            if db(db.users.id==complaint.user_id).select().first().hostel==auth.user.hostel:
+                res.append(complaint)
+        elif complaint.type_==2:
+            res.append(complaint)
+    return dict(mycomplaints=res)
+
+def userlist():#list of all users ; /userlist.json
+    return dict(val=db(db.users).select())
+
+@auth.requires_login()
+def newcomplaint():# ; /newcomplaint.json?comp_type=<comp_type>&title=<title>&description=<description>&assignedval=<assignedval>&anonymity=<anonymity>
+    if ("comp_type" in request.vars) and ("description" in request.vars):
+        comp_type = int(request.vars["comp_type"])
+        description = str(request.vars["description"])
+        title = str(request.vars["title"])
+        assignedval = int(request.vars["assignedval"]) #0 for electrician, 1 for plumber, 2 for warden, 3 for dean
+        anonymity = int(request.vars["anonymity"]) #0 for public, 1 for anonymous
+        users = []
+        assignedtol=3
+        if comp_type==0:
+            resolver = auth.user.id
+            users.append(auth.user)
+            if assignedval==0:
+                assignedtol= (2*auth.user.hostel) + 2
+            elif assignedval==1:
+                assignedtol= (2*auth.user.hostel) + 2
+        elif comp_type==1:
+            resolver = auth.user.hostel
+            if assignedval==2:
+                assignedtol= auth.user.hostel
+            for val in db(db.users.hostel==auth.user.hostel).select():
+                users.append(val)
+        elif comp_type==2:
+            resolver = 3
+            if assignedval==2:
+                assignedtol= 3
+            for val in db(db.users).select():
+                users.append(val)
+        cid = db.complaints.insert(user_id=auth.user.id, type_=comp_type, title=title, description=description, resolved=False, resolver=resolver, assignedto=assignedtol, anonymity=anonymity)
+        for user in users:
+            if user.id != auth.user.id:
+                db.notifications.insert(user_id=user.id, description="%s posted a new complaint for %s"%((auth.user.first_name+" "+auth.user.last_name).title(), title))
+        '''
+        if comp_type==0:
+            users.append(auth.user.id)
+        elif comp_type==1:
+            users = (db.users.hostel==auth.user.hostel)
+        elif comp_type==2:
+            users = db.users
+        for user in users:
+            db.notifications.insert(user_id=user, description="%s posted a new complaint for %s"%((auth.user.first_name+" "+auth.user.last_name).title(), title))
+        '''
+        return dict(success=True, cid=cid)
+    else:
+        return dict(success=False)
+
+@auth.requires_login()
+def resolve():#resolves complaint (input = complaint_id) ; /resolve.json/<complaint_id>
+    try:
+        cid = int(request.args[0])
+    except Exception, e:
+        raise e
+    if (db(db.complaints.id==cid).select().first().resolver)==auth.user.id:
+        db(db.complaints.id==cid).update(resolved = True)
+        return dict(success=True)
+    return dict(success=False)
+    #return dict(val=db(db.complaints.id==cid).select().first().resolver)
+
+@auth.requires_login()
+def complaint():#return complaint with comments (input = complaint_id) ; /complaint.json/<complaint_id>
+    try:
+        cid = int(request.args[0])
+    except Exception, e:
+        raise e
+    complaints = db(db.complaints.id==cid).select().first()
+    comments, comment_users = get_comments(cid)
+    tags, tag_users = get_tags(cid)
+    return dict(complaints=complaints, comments=comments, comment_users=comment_users, tags=tags, tag_users=tag_users)
+
+def get_comments(complaint_id):#caller function
+    comments =  db(db.comcomp.complaint_id==complaint_id).select()
+    comment_users = []
+    for comment in comments:
+        comment_users.append(db(db.users.id==comment.user_id).select().first())
+    return comments, comment_users
+
+def get_tags(complaint_id):#caller function
+    tags =  db(db.comtag.complaint_id==complaint_id).select()
+    tag_users = []
+    for tag in tags:
+        tag_users.append(db(db.users.id==tag.user_id).select().first())
+    return tags, tag_users
+
+@auth.requires_login()
+def upvote():#mark vote ; /upvote.json?complaint_id=<cid>
+    try:
+        cid = int(request.vars["complaint_id"])
+    except Exception, e:
+        raise e
+    for val in db(db.vote.complaint_id==cid).select():
+        if val.user_id==auth.user.id:
+            return dict(success=False)
+    val = db(db.complaints.id==cid).select().first().upvote
+    val = val + 1
+    db(db.complaints.id==cid).update(upvote = val)
+    db.vote.insert(complaint_id=cid, user_id=auth.user.id, type_=1)
+    return dict(success=True, val = db(db.complaints.id==cid).select())
+
+@auth.requires_login()
+def downvote():#mark vote ; /downvote.json?complaint_id=<cid>
+    try:
+        cid = int(request.vars["complaint_id"])
+    except Exception, e:
+        raise e
+    for val in db(db.vote.complaint_id==cid).select():
+        if val.user_id==auth.user.id:
+            return dict(success=False)
+    val = db(db.complaints.id==cid).select().first().downvote
+    val = val + 1
+    db(db.complaints.id==cid).update(downvote = val)
+    db.vote.insert(complaint_id=cid, user_id=auth.user.id, type_=-1)
+    return dict(success=True, val = db(db.complaints.id==cid).select())
+
+@auth.requires_login()
+def put_comment():
+    try:
+        cid = int(request.vars["complaint_id"])
+    except Exception, e:
+        raise e
+    try:
+        desc = str(request.vars["description"])
+    except Exception, e:
+        raise e
+    db.comcomp.insert(complaint_id=cid, user_id=auth.user.id, description=desc)
+    return dict(success=True, val = db(db.complaints.id==cid).select())
+
+@auth.requires_login()
+def put_tag():
+    try:
+        cid = int(request.vars["complaint_id"])
+    except Exception, e:
+        raise e
+    try:
+        desc = str(request.vars["description"])
+    except Exception, e:
+        raise e
+    db.comtag.insert(complaint_id=cid, user_id=auth.user.id, description=desc)
+    return dict(val = db(db.complaints.id==cid).select())
+
+###EDIT's end###
+
+def populate_db():
+    ## Populate DB Script
+
+    ## clear database
+    for table in db.tables():
+            try:
+                    db(db[table].id>0).delete()
+                    print "Cleared",table
+            except Exception, e:
+                    print "Couldn't clear",table
+
+    ## create 3 students
+    db.users.insert(
+            first_name="Saiesvar",  # Kumaon
+            last_name="Vipparathy",
+            email="cs1140266@cse.iitd.ac.in",
+            username="cs1140266",
+            entry_no="2014CS10266",
+            type_=0,
+            password="saiesvar",
+    )
+
+    db.users.insert(
+            first_name="Harshil",   # Girnar
+            last_name="Meena",
+            email="cs1140222@cse.iitd.ac.in",
+            username="cs1140222",
+            entry_no="2014CS10222",
+            type_=0,
+            password="harshil",
+    )
+
+    db.users.insert(
+            first_name="Nagaraju",  # Girnar
+            last_name="Ajmeera",
+            email="cs1140208@cse.iitd.ac.in",
+            username="cs1140208",
+            entry_no="2014CS10208",
+            type_=0,
+            password="nagaraju",
+    )
+
+
+    ## create 2 wardens + 1 dean
+
+    db.users.insert(
+            first_name="Warden",
+            last_name="Kumaon",
+            email="wardenkumaon@cse.moodle.in",
+            username="wardenkumaon",
+            entry_no="wardenkumaon",
+            type_=1,
+            password="wardenkumaon",
+    )
+
+    db.users.insert(
+            first_name="Warden",
+            last_name="Girnar",
+            email="wardengirnar@cse.iitd.ac.in",
+            username="wardengirnar",
+            entry_no="wardengirnar",
+            type_=1,
+            password="wardengirnar",
+    )
+
+
+    db.users.insert(
+            first_name="Dean",
+            last_name="Student Welfare",
+            email="dean@cse.iitd.ac.in",
+            username="dean",
+            entry_no="dean",
+            type_=1,
+            password="dean",
+    )
+
+    ## create 3 individual courses + 2 hostel courses + 1 insti course
+    db.courses.insert(
+            name="saiesvarcourse",
+            code="saiesvarcourse",
+            description="none",
+            credits=3,
+            l_t_p="none"
+    )
+
+    db.courses.insert(
+            name="harshilcourse",
+            code="harshilcourse",
+            description="none",
+            credits=3,
+            l_t_p="none"
+    )
+
+    db.courses.insert(
+            name="nagarajucourse",
+            code="nagarajucourse",
+            description="none",
+            credits=3,
+            l_t_p="none"
+    )
+
+    db.courses.insert(
+            name="kumaoncourse",
+            code="kumaoncourse",
+            description="none",
+            credits=3,
+            l_t_p="none"
+    )
+
+    db.courses.insert(
+            name="girnarcourse",
+            code="girnarcourse",
+            description="none",
+            credits=3,
+            l_t_p="none"
+    )
+
+    db.courses.insert(
+            name="iitcourse",
+            code="iitcourse",
+            description="none",
+            credits=3,
+            l_t_p="none"
+    )
+
+
+
+    ## create 7 registered courses
+    db.registered_courses.insert(	
+            course_id=1,
+            professor=1,
+            year_=2016,
+            semester=2,
+            starting_date=datetime(2016,1,1),
+            ending_date=datetime(2016,5,10),
+    )
+
+    db.registered_courses.insert(
+            course_id=2,
+            professor=2,
+            year_=2016,
+            semester=2,
+            starting_date=datetime(2016,1,1),
+            ending_date=datetime(2016,5,10),
+    )
+
+    db.registered_courses.insert(
+            course_id=3,
+            professor=3,
+            year_=2016,
+            semester=2,
+            starting_date=datetime(2016,1,1),
+            ending_date=datetime(2016,5,10),
+    )
+
+    db.registered_courses.insert(
+            course_id=4,
+            professor=4,
+            year_=2016,
+            semester=2,
+            starting_date=datetime(2016,1,1),
+            ending_date=datetime(2016,5,10),
+    )
+
+    db.registered_courses.insert(
+            course_id=5,
+            professor=5,
+            year_=2016,
+            semester=2,
+            starting_date=datetime(2016,1,1),
+            ending_date=datetime(2016,5,10),
+    )
+
+    db.registered_courses.insert(
+            course_id=6,
+            professor=6,
+            year_=2016,
+            semester=2,
+            starting_date=datetime(2016,1,1),
+            ending_date=datetime(2016,5,10),
+    )
+
+
+    ## register 3 students for 5 courses each out of 7 registered courses
+    db.student_registrations.insert(student_id=1,registered_course_id=4)
+    db.student_registrations.insert(student_id=2,registered_course_id=5)
+    db.student_registrations.insert(student_id=3,registered_course_id=5)
+    db.student_registrations.insert(student_id=1,registered_course_id=6)
+    db.student_registrations.insert(student_id=2,registered_course_id=6)
+    db.student_registrations.insert(student_id=3,registered_course_id=6)
+
+
+
+    ## Create Static Variables
+    db.static_vars.insert(
+            name="current_year",
+            int_value=2016,
+            string_value="2016"
+    )
+
+    db.static_vars.insert(
+            name="current_sem",
+            int_value=2,
+            string_value="2"
+    )
+
+def api():
+    return """
+Moodle Plus API (ver 1.0)
+-------------------------
+
+Url: /default/login.json
+Input params:
+    userid: (string)
+    password: (string)
+Output params:
+    success: (boolean) True if login success and False otherwise
+    user: (json) User details if login is successful otherwise False
+
+
+Url: /default/logout.json
+Input params:
+Output params:
+    success: (boolean) True if logout successful and False otherwise
+
+
+Url: /courses/list.json
+Input params:
+Output params:
+    current_year: (int)
+    current_sem: (int) 0 for summer, 1 break, 2 winter
+    courses: (List) list of courses
+    user: (dictionary) user details
+
+Url: /threads/new.json
+Input params:
+    title: (string) can't be empty
+    description: (string) can't be empty
+    course_code: (string) must be a registered courses
+Output params:
+    success: (bool) True or False depending on whether thread was posted
+    thread_id: (bool) id of new thread created
+
+    """
